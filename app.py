@@ -47,7 +47,7 @@ def display_logs():
 def main():
     # Set page config
     st.set_page_config(
-        page_title="Healthcare Fraud Detection",
+        page_title="Payment Integrity Analytics",
         page_icon="🔍",
         layout="wide"
     )
