@@ -217,11 +217,17 @@ def apply_dataset_level_rule(claims_df, rule_id, rule_desc, rule_condition):
 
 def apply_rules(rules_df, claims_df):
     """
-    Apply all rules to the claims data
+    Apply all rules to the claims data sequentially
+    Each claim can only be identified by one rule - the first rule that matches it
     """
     all_results = []
+    remaining_claims = claims_df.copy()
     
-    # Process each rule
+    # Sort rules by Rule_ID to ensure we process in the correct sequence
+    # Assuming Rule_ID can be converted to numeric for proper sorting
+    rules_df = rules_df.sort_values(by='Rule_ID')
+    
+    # Process each rule sequentially
     for _, rule in rules_df.iterrows():
         rule_id = rule['Rule_ID']
         rule_desc = rule['Rule_Desc']
@@ -229,11 +235,17 @@ def apply_rules(rules_df, claims_df):
         rule_condition = rule['Rule_Allegation']
         
         print(f"Processing rule {rule_id}: {rule_desc}")
+        print(f"Remaining claims for consideration: {len(remaining_claims)}")
+        
+        # Skip processing if no claims remain
+        if remaining_claims.empty:
+            print("No claims left to process. Stopping rule application.")
+            break
         
         if rule_level == 'Record':
-            result = apply_record_level_rule(claims_df, rule_id, rule_desc, rule_condition)
+            result = apply_record_level_rule(remaining_claims, rule_id, rule_desc, rule_condition)
         elif rule_level == 'DataSet':
-            result = apply_dataset_level_rule(claims_df, rule_id, rule_desc, rule_condition)
+            result = apply_dataset_level_rule(remaining_claims, rule_id, rule_desc, rule_condition)
         else:
             print(f"Unknown rule level: {rule_level}")
             continue
@@ -241,6 +253,25 @@ def apply_rules(rules_df, claims_df):
         if not result.empty:
             print(f"Rule {rule_id} found {len(result)} matches")
             all_results.append(result)
+            
+            # Remove identified claims from the pool of remaining claims
+            # First, create a key to identify unique claims
+            # We'll use all columns except those added by the rule application
+            key_columns = [col for col in result.columns if col not in ['rule_id', 'rule_desc']]
+            
+            # Get the identified claim IDs
+            # We need a reliable way to identify unique claims - using all columns as a composite key
+            identified_claims = result[key_columns].copy()
+            
+            # Create a merge key for efficient matching
+            identified_claims['__merge_key__'] = identified_claims.apply(lambda row: hash(tuple(row)), axis=1)
+            remaining_claims['__merge_key__'] = remaining_claims.apply(lambda row: hash(tuple(row)), axis=1)
+            
+            # Remove claims that were identified by this rule
+            remaining_claims = remaining_claims[~remaining_claims['__merge_key__'].isin(identified_claims['__merge_key__'])]
+            
+            # Remove the temporary merge key
+            remaining_claims = remaining_claims.drop(columns=['__merge_key__'])
         else:
             print(f"Rule {rule_id} found no matches")
     
