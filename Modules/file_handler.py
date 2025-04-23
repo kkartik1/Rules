@@ -8,7 +8,7 @@ def upload_files():
     """
     Provide UI for uploading rules and claims files and return the DataFrames
     """
-    st.title("Healthcare Claims Fraud Detection")
+    st.title("Payment Integrity Analytics")
     
     st.subheader("Upload Files")
     
